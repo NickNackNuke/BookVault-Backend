@@ -6,6 +6,16 @@ const generateSessionId = () => {
   return crypto.randomBytes(32).toString('hex');
 };
 
+// Format user response to include userId
+const formatUserResponse = (user) => {
+  return {
+    id: user._id,
+    userId: user.userId || 'No userId generated', // Add fallback to help debug
+    username: user.username,
+    email: user.email
+  };
+};
+
 // Signup Controller
 exports.signup = async (req, res) => {
   try {
@@ -22,12 +32,22 @@ exports.signup = async (req, res) => {
       });
     }
 
-    // Create new user
-    const user = await User.create({
+    // Create new user with unique ID - use regular create for now to debug
+    const user = new User({
       username,
       email,
       password
     });
+    
+    // Generate userId explicitly if needed
+    if (!user.userId) {
+      user.userId = `USR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    }
+    
+    // Save the user
+    await user.save();
+    
+    console.log('User after save:', JSON.stringify(user, null, 2));
 
     // Generate session ID
     const sessionId = generateSessionId();
@@ -42,15 +62,16 @@ exports.signup = async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     });
 
-    console.log('User created successfully:', { id: user._id, username: user.username, email: user.email });
+    console.log('User created successfully:', { 
+      id: user._id, 
+      userId: user.userId, 
+      username: user.username, 
+      email: user.email 
+    });
 
     res.status(201).json({
       success: true,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email
-      }
+      user: formatUserResponse(user)
     });
   } catch (error) {
     console.error('Signup error:', error);
@@ -108,11 +129,7 @@ exports.login = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email
-      }
+      user: formatUserResponse(user)
     });
   } catch (error) {
     console.error('Login error:', error);

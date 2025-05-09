@@ -14,6 +14,7 @@ console.log('PORT:', process.env.PORT);
 
 // Import routes
 const authRoutes = require('./routes/auth');
+const bookRoutes = require('./routes/books');
 
 const app = express();
 
@@ -55,6 +56,7 @@ mongoose.connect(process.env.MONGODB_URI)
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/books', bookRoutes);
 
 // Test endpoint to list all users
 app.get('/api/user', async (req, res) => {
