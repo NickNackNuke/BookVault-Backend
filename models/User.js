@@ -13,6 +13,7 @@ function generateUserId() {
   return result;
 }
 
+// Reorder the fields in the schema to put userId above username
 const userSchema = new mongoose.Schema({
   userId: {
     type: String,
@@ -121,6 +122,23 @@ userSchema.methods.toPublic = function() {
     email: this.email,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt
+  };
+};
+
+// Override toJSON method to control field order in JSON serialization
+userSchema.methods.toJSON = function() {
+  const user = this.toObject();
+  
+  // Return fields in a specific order
+  return {
+    _id: user._id,
+    userId: user.userId,
+    username: user.username,
+    email: user.email,
+    sessionId: user.sessionId,
+    lastActive: user.lastActive,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt
   };
 };
 

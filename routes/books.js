@@ -21,6 +21,15 @@ router.get('/borrowed', bookController.getBorrowedBooks);
 // Get all books lent by the authenticated user
 router.get('/lent', bookController.getLentBooks);
 
+// Get all unique genres
+router.get('/genres', bookController.getGenres);
+
+// Get books by genre
+router.get('/genre/:genre', bookController.getBooksByGenre);
+
+// Search books with filters
+router.get('/search', bookController.searchBooks);
+
 // Get a single book
 router.get('/:id', bookController.getBook);
 

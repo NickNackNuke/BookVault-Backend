@@ -8,11 +8,15 @@ const generateSessionId = () => {
 
 // Format user response to include userId
 const formatUserResponse = (user) => {
+  // Format user response to ensure userId appears before username
+  const userObj = user.toObject ? user.toObject() : user;
+  
+  // Return fields in a specific order with userId at the top
   return {
-    id: user._id,
-    userId: user.userId || 'No userId generated', // Add fallback to help debug
-    username: user.username,
-    email: user.email
+    id: userObj._id,
+    userId: userObj.userId || 'No userId generated',
+    username: userObj.username,
+    email: userObj.email
   };
 };
 

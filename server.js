@@ -20,7 +20,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:3000', // Your frontend URL
+  origin: 'http://localhost:5000', // Your frontend URL
   credentials: true
 }));
 app.use(express.json());
@@ -76,6 +76,6 @@ app.get('/', (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-}); 
+app.listen(5000, '0.0.0.0', () => {
+  console.log('Server running on port 5000');
+});
