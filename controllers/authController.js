@@ -35,6 +35,9 @@ const formatUserResponse = (user) => {
   };
 };
 
+// Export the function
+exports.formatUserResponse = formatUserResponse;
+
 // Signup Controller
 exports.signup = async (req, res) => {
   try {

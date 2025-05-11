@@ -16,7 +16,7 @@ router.get('/', bookController.getBooks);
 router.get('/available', bookController.getAvailableBooks);
 
 // Get all books borrowed by the authenticated user
-router.get('/borrowed', bookController.getBorrowedBooks);
+router.get('/borrowed', bookController.getBorrowedBooksByCurrentUser);
 
 // Get all books lent by the authenticated user
 router.get('/lent', bookController.getLentBooks);
@@ -48,10 +48,22 @@ router.patch('/:id/toggle', bookController.toggleBookSelection);
 // Request to borrow a book (New Route)
 router.post('/:id/request-borrow', bookController.requestToBorrowBook);
 
+// Get books owned by the current user that have pending approval (New Route)
+router.get('/owned/pending-approval', bookController.getBooksWithPendingRequests);
+
+// Approve a borrow request (New Route)
+router.post('/:bookId/approve/:requestingUserId', bookController.approveBorrowRequest);
+
+// Reject a borrow request (New Route)
+router.post('/:bookId/reject/:requestingUserId', bookController.rejectBorrowRequest);
+
 // Borrow a book
 router.post('/:id/borrow', bookController.borrowBook);
 
 // Return a book
 router.post('/:id/return', bookController.returnBook);
+
+// Route for a book owner to update book details (title, author, genre)
+router.put('/:id/details', bookController.updateBookDetails);
 
 module.exports = router; 
