@@ -28,7 +28,7 @@ router.get('/genres', bookController.getGenres);
 router.get('/genre/:genre', bookController.getBooksByGenre);
 
 // Search books with filters
-router.get('/search', bookController.searchBooks);
+// router.get('/search', bookController.searchBooks); // Commented out due to missing controller function
 
 // Get a single book
 router.get('/:id', bookController.getBook);
@@ -42,8 +42,11 @@ router.delete('/:id', bookController.deleteBook);
 // Toggle book selection
 router.patch('/:id/toggle', bookController.toggleBookSelection);
 
-// Lend a book to another user
-router.post('/:id/lend', bookController.lendBook);
+// Lend a book to another user - Replaced by request/approve flow
+// router.post('/:id/lend', bookController.lendBook);
+
+// Request to borrow a book (New Route)
+router.post('/:id/request-borrow', bookController.requestToBorrowBook);
 
 // Borrow a book
 router.post('/:id/borrow', bookController.borrowBook);

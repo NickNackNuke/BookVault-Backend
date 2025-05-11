@@ -67,13 +67,18 @@ const bookSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['available', 'borrowed', 'lent'],
+        enum: ['available', 'borrowed', 'lent', 'pending_approval'],
         default: 'available'
     },
     isSelected: {
         type: Boolean,
         default: false
-    }
+    },
+    pendingBorrowRequests: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: []
+    }]
 }, {
     timestamps: true
 });

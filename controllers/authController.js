@@ -8,15 +8,30 @@ const generateSessionId = () => {
 
 // Format user response to include userId
 const formatUserResponse = (user) => {
-  // Format user response to ensure userId appears before username
   const userObj = user.toObject ? user.toObject() : user;
-  
-  // Return fields in a specific order with userId at the top
+
+  // Log the raw user object received by this function
+  console.log('formatUserResponse: Received user object:', JSON.stringify(userObj, null, 2));
+
+  let responseId = null;
+  if (userObj && userObj._id) { // Check if userObj and userObj._id exist
+    responseId = userObj._id.toString(); // Ensure it's a string
+  } else {
+    console.error('CRITICAL: _id is missing or userObj is null/undefined in formatUserResponse. User Object:', JSON.stringify(userObj, null, 2));
+  }
+
+  let responseUserId = 'No userId generated';
+  if (userObj && userObj.userId) {
+      responseUserId = userObj.userId;
+  } else if (userObj) { // userObj exists but userId doesn't
+      console.warn('Warning: userId is missing from user object in formatUserResponse. User Object:', JSON.stringify(userObj, null, 2));
+  }
+
   return {
-    id: userObj._id,
-    userId: userObj.userId || 'No userId generated',
-    username: userObj.username,
-    email: userObj.email
+    id: responseId, // This is the MongoDB _id as a string
+    userId: responseUserId, // This is the custom USR-XXXX ID
+    username: userObj ? userObj.username : undefined,
+    email: userObj ? userObj.email : undefined
   };
 };
 
@@ -90,7 +105,7 @@ exports.signup = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, username, password } = req.body;
-    console.log('Login attempt for:', email || username);
+    console.log('Login attempt with body:', JSON.stringify(req.body));
 
     // Use whichever is provided
     const user = await User.findOne({
@@ -101,20 +116,24 @@ exports.login = async (req, res) => {
     });
 
     if (!user) {
-      console.log('No user found with email or username:', email, username);
+      console.log('Login attempt: No user found with email or username:', email, username);
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials'
+        message: 'Invalid credentials. User not found.'
       });
     }
+
+    // Log the raw user document fetched from DB *before* any modification or formatting
+    console.log('Login attempt: User found in DB (raw Mongoose object):', JSON.stringify(user, null, 2));
+    console.log('Login attempt: User found in DB (_id):', user._id ? user._id.toString() : 'MISSING_ID', 'Type:', user._id ? typeof user._id : 'N/A');
 
     // Check password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      console.log('Password mismatch for user:', email || username);
+      console.log('Login attempt: Password mismatch for user:', user.username || user.email);
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials'
+        message: 'Invalid credentials. Password mismatch.'
       });
     }
 
@@ -131,15 +150,18 @@ exports.login = async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     });
 
+    const formattedUser = formatUserResponse(user);
+    console.log('Login successful. Formatted user response:', JSON.stringify(formattedUser, null, 2));
+
     res.status(200).json({
       success: true,
-      user: formatUserResponse(user)
+      user: formattedUser
     });
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('Login error:', error.message, error.stack); // Log full error stack
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Server error during login.' // More generic message to client
     });
   }
 };
