@@ -8,54 +8,45 @@ const { formatUserResponse } = require('./authController');
 const formatBookResponse = (book) => {
     if (!book) return null;
     
-    const bookObj = book.toObject ? book.toObject() : book;
+    // Ensure we are working with a plain object
+    const bookObj = book.toObject ? book.toObject() : { ...book };
     
     let user = null;
     if (bookObj.user) {
-        if (bookObj.user.toObject) { // If it's a Mongoose document
-            user = formatUserResponse(bookObj.user.toObject());
-        } else { // If it's already an object (e.g., from aggregation/population)
-            user = formatUserResponse(bookObj.user);
-        }
+        // Assuming formatUserResponse handles .toObject() internally if needed
+        user = formatUserResponse(bookObj.user);
     }
 
     let borrower = null;
-    if (bookObj.borrower && bookObj.borrower._id) { // Check if borrower is populated
-        if (bookObj.borrower.toObject) {
-            borrower = formatUserResponse(bookObj.borrower.toObject());
-        } else {
-            borrower = formatUserResponse(bookObj.borrower);
-        }
-    } else if (bookObj.borrower) { // If borrower is just an ID (should ideally not happen if populated)
-        borrower = bookObj.borrower.toString(); // Or handle as needed
+    if (bookObj.borrower) {
+        borrower = formatUserResponse(bookObj.borrower);
     }
 
-    let pendingBorrowRequests = [];
+    let pendingBorrowRequestsFormatted = [];
     if (bookObj.pendingBorrowRequests && Array.isArray(bookObj.pendingBorrowRequests)) {
-        pendingBorrowRequests = bookObj.pendingBorrowRequests.map(userObj => {
-            if (userObj.toObject) {
-                return formatUserResponse(userObj.toObject());
-            }
-            return formatUserResponse(userObj); // Assuming it's already a plain object
-        });
+        pendingBorrowRequestsFormatted = bookObj.pendingBorrowRequests.map(userObj => 
+            formatUserResponse(userObj)
+        );
     }
 
     return {
-        _id: bookObj._id,
+        _id: bookObj._id ? bookObj._id.toString() : undefined, // Changed from 'id' to '_id'
         bookId: bookObj.bookId,
         title: bookObj.title,
         author: bookObj.author,
         genre: bookObj.genre,
         imageUrl: bookObj.imageUrl,
-        user: user,
-        borrower: borrower,
+        user: user, // Populated and formatted user object
+        borrower: borrower, // Populated and formatted user object
         status: bookObj.status,
-        isSelected: bookObj.isSelected,
-        createdAt: bookObj.createdAt,
-        updatedAt: bookObj.updatedAt,
-        pendingBorrowRequests: pendingBorrowRequests,
-        borrowDate: bookObj.borrowDate ? bookObj.borrowDate.toISOString() : null,
-        returnDate: bookObj.returnDate ? bookObj.returnDate.toISOString() : null,
+        // isSelected: bookObj.isSelected, // Keep commented if not consistently used/needed by Android
+        pendingBorrowRequests: pendingBorrowRequestsFormatted,
+        
+        // Standardized Dates as ISO strings or null
+        borrowDate: bookObj.borrowDate instanceof Date ? bookObj.borrowDate.toISOString() : null,
+        returnDate: bookObj.returnDate instanceof Date ? bookObj.returnDate.toISOString() : null,
+        createdAt: bookObj.createdAt instanceof Date ? bookObj.createdAt.toISOString() : null,
+        updatedAt: bookObj.updatedAt instanceof Date ? bookObj.updatedAt.toISOString() : null,
     };
 };
 
@@ -139,16 +130,16 @@ exports.getAvailableBooks = async (req, res) => {
 exports.getBorrowedBooksByCurrentUser = async (req, res) => {
     console.log('[bookController.js] getBorrowedBooksByCurrentUser called');
     try {
-        const userId = req.userId;
+        const userId = req.user._id;
         // Find books where the borrower field matches the current user's ID
         const books = await Book.find({ borrower: userId })
                                 .populate('user') // Populate the owner's details
                                 .populate('borrower') // Populate the borrower's details (current user)
                                 .populate('pendingBorrowRequests'); // Although likely not relevant for this view
         console.log(`[bookController.js] Found ${books.length} books borrowed by user ${userId}`);
-        res.status(200).json(books.map(formatBookResponse));
+        res.status(200).json({ success: true, books: books.map(formatBookResponse) });
     } catch (error) {
-        console.error(`[bookController.js] Error fetching borrowed books for user ${req.userId}:`, error);
+        console.error(`[bookController.js] Error fetching borrowed books for user ${req.user._id}:`, error);
         res.status(500).json({ message: 'Error fetching borrowed books', error: error.message });
     }
 };
@@ -179,7 +170,6 @@ exports.getBook = async (req, res) => {
 exports.updateBook = async (req, res) => {
     console.log(`[bookController.js] updateBook called for book ID: ${req.params.id} by user: ${req.user._id} with body:`, req.body);
     const updates = Object.keys(req.body);
-    // Define which fields are allowed to be updated by the user
     const allowedUpdates = ['title', 'author', 'genre', 'imageUrl']; 
     const isValidOperation = updates.every(update => allowedUpdates.includes(update));
 
@@ -189,36 +179,38 @@ exports.updateBook = async (req, res) => {
     }
 
     try {
-        let query = { user: req.user._id }; // Ensure book belongs to the user
-        if (mongoose.Types.ObjectId.isValid(req.params.id)) {
-            query._id = req.params.id;
+        const idParam = req.params.id;
+        // Explicitly create the user ObjectId for the query
+        const userObjectId = new mongoose.Types.ObjectId(req.user._id);
+        let query = { user: userObjectId };
+
+        if (mongoose.Types.ObjectId.isValid(idParam)) {
+            console.log(`[bookController.js] updateBook: Querying by MongoDB _id: ${idParam}`);
+            query._id = idParam;
         } else {
-            // If you expect to update by custom bookId via this route, this logic needs adjustment.
-            // For now, consistent with delete, assuming _id is used in the route param.
-            console.log('[bookController.js] updateBook: Invalid book ID format.');
-            return res.status(400).json({ success: false, error: 'Invalid book ID format' });
+            console.log(`[bookController.js] updateBook: Querying by custom bookId: ${idParam}`);
+            query.bookId = idParam; // Use custom bookId for query
         }
 
         const book = await Book.findOne(query);
 
         if (!book) {
-            console.log(`[bookController.js] updateBook: Book not found or not owned by user. Book ID: ${req.params.id}, User: ${req.user._id}`);
+            console.log(`[bookController.js] updateBook: Book not found or not owned by user. Query: ${JSON.stringify(query)}`);
             return res.status(404).json({ success: false, error: 'Book not found or you do not own this book' });
         }
 
         updates.forEach(update => book[update] = req.body[update]);
-        await book.save(); // This will also trigger Mongoose pre-save hooks if any
+        await book.save();
         
-        // Populate user and borrower for the response, similar to getBooks
         const populatedBook = await Book.findById(book._id)
-                                    .populate('user', 'username email')
-                                    .populate('borrower', 'username email');
+                                    .populate('user', 'username email _id userId')
+                                    .populate('borrower', 'username email _id userId')
+                                    .populate('pendingBorrowRequests', 'username email _id userId');
 
-        console.log('[bookController.js] Book updated successfully:', populatedBook);
+        console.log('[bookController.js] Book updated successfully:', formatBookResponse(populatedBook));
         res.json({ success: true, book: formatBookResponse(populatedBook) });
     } catch (error) {
         console.error('[bookController.js] Error in updateBook:', error);
-        // Check for Mongoose validation errors (e.g., if a required field is set to empty)
         if (error.name === 'ValidationError') {
             return res.status(400).json({ success: false, error: error.message });
         }
@@ -230,29 +222,29 @@ exports.updateBook = async (req, res) => {
 exports.deleteBook = async (req, res) => {
     console.log(`[bookController.js] deleteBook called for book ID: ${req.params.id} by user: ${req.user._id}`);
     try {
-        let query = { user: req.user._id }; // Ensure the book belongs to the user
-        
-        // Handle both ObjectId and bookId for deletion if your findBookById supports it for deletion scenarios
-        // For simplicity here, assuming req.params.id is the MongoDB _id
-        if (mongoose.Types.ObjectId.isValid(req.params.id)) {
-            query._id = req.params.id;
+        const bookIdParam = req.params.id;
+        // Explicitly create the user ObjectId for the query
+        const userObjectId = new mongoose.Types.ObjectId(req.user._id);
+        let query = { user: userObjectId }; 
+
+        if (mongoose.Types.ObjectId.isValid(bookIdParam)) {
+            console.log(`[bookController.js] Attempting to delete by MongoDB _id: ${bookIdParam}`);
+            query._id = bookIdParam;
         } else {
-            // If you expect bookId (e.g., 'BK-XXXXX') in params, you might need to adjust
-            // For now, this will only work if req.params.id is a valid MongoDB ObjectId
-            // or if findOneAndDelete is adapted to also search by a custom bookId field AND user.
-            // To be safe and simple for now, let's assume it's _id.
-            return res.status(400).json({ success: false, error: 'Invalid book ID format for deletion via _id' });
+            console.log(`[bookController.js] Attempting to delete by custom bookId: ${bookIdParam}`);
+            query.bookId = bookIdParam; 
         }
         
+        console.log(`[bookController.js] Executing Book.findOneAndDelete with query: ${JSON.stringify(query)}`);
         const book = await Book.findOneAndDelete(query);
 
         if (!book) {
-            console.log(`[bookController.js] Book not found or not owned by user for deletion. Book ID: ${req.params.id}, User: ${req.user._id}`);
+            console.log(`[bookController.js] Book not found or not owned by user for deletion. Query used: ${JSON.stringify(query)}`);
             return res.status(404).json({ success: false, error: 'Book not found or you do not own this book' });
         }
         
-        console.log(`[bookController.js] Book deleted successfully. Book ID: ${book._id}`);
-        res.json({ success: true, message: 'Book deleted successfully', book: formatBookResponse(book) }); // Return the deleted book
+        console.log(`[bookController.js] Book deleted successfully. Book ID: ${book._id}, Custom BookId: ${book.bookId}`);
+        res.json({ success: true, message: 'Book deleted successfully', book: formatBookResponse(book) });
     } catch (error) {
         console.error('[bookController.js] Error in deleteBook:', error);
         res.status(500).json({ success: false, error: error.message });
