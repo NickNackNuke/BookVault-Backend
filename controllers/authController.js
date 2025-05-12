@@ -93,7 +93,8 @@ exports.signup = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      user: formatUserResponse(user)
+      user: formatUserResponse(user),
+      token: sessionId // Include token in response for mobile apps
     });
   } catch (error) {
     console.error('Signup error:', error);
@@ -158,7 +159,8 @@ exports.login = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      user: formattedUser
+      user: formattedUser,
+      token: sessionId // Include token in response for mobile apps
     });
   } catch (error) {
     console.error('Login error:', error.message, error.stack); // Log full error stack

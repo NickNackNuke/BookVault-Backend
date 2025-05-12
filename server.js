@@ -15,13 +15,16 @@ console.log('PORT:', process.env.PORT);
 // Import routes
 const authRoutes = require('./routes/auth');
 const bookRoutes = require('./routes/books');
+const userRoutes = require('./routes/user');
 
 const app = express();
 
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:5000', // Your frontend URL
-  credentials: true
+  origin: true, // Allow requests from any origin
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 app.use(express.json());
 app.use(cookieParser());
@@ -57,18 +60,7 @@ mongoose.connect(process.env.MONGODB_URI)
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/books', bookRoutes);
-
-// Test endpoint to list all users
-app.get('/api/user', async (req, res) => {
-  try {
-    const users = await User.find({}, { password: 0 }); // Exclude password field
-    console.log('All users:', users);
-    res.json(users);
-  } catch (error) {
-    console.error('Error fetching users:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+app.use('/api/user', userRoutes);
 
 // Basic route
 app.get('/', (req, res) => {
